@@ -14,11 +14,8 @@ notify_all_accounts=switch, false, tag=全部户号, desc=多户号时返回全�
 timeout=input, "60", tag=超时时间, desc=单次接口处理最大秒数
 
 [Script]
-# Scripting -> 本地伪接口 -> 原版 95598.js 返回 JSON
-http-request ^https?:\/\/api\.wsgw-rewrite\.com\/electricity\/bill\/all script-path=https://raw.githubusercontent.com/Yuheng0101/X/main/Tasks/95598/95598.js, requires-body=true, timeout={timeout}, tag=网上国网接口, enable={sgcc_enable}, argument=[{username},{password},{debug},{show_recent_usage},{notify_all_accounts}]
-
-# 仅修正登录前置 c02/f02 请求字段类型/常规请求头
-http-request ^https:\/\/www\.95598\.cn\/api\/oauth2\/outer\/c02\/f02(?:\?.*)?$ script-path=https://raw.githubusercontent.com/Timkeltis/SGCC/main/c02-fix.js, requires-body=true, timeout=15, tag=网上国网c02兼容修正, enable={sgcc_enable}
+# Scripting -> 本地伪接口 -> 自有修正版 95598.js -> 返回 JSON
+http-request ^https?:\/\/api\.wsgw-rewrite\.com\/electricity\/bill\/all script-path=https://raw.githubusercontent.com/Timkeltis/SGCC/main/95598.js, requires-body=true, timeout={timeout}, tag=网上国网接口, enable={sgcc_enable}, argument=[{username},{password},{debug},{show_recent_usage},{notify_all_accounts}]
 
 [MITM]
-hostname=api.wsgw-rewrite.com,www.95598.cn
+hostname=api.wsgw-rewrite.com
