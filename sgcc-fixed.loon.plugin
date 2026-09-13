@@ -1,23 +1,23 @@
 #!name=网上国网-修复版
 #!desc=网上国网余量/用电查询（Loon兼容修复）
-#!author=Timkeltis + upstream Yuheng0101/X
+#!author=Timkeltis + Yuheng0101/X
 #!icon=https://is1-ssl.mzstatic.com/image/thumb/Purple116/v4/83/d8/8a/83d88a92-5a4d-7a2f-118c-80d795e7a9f6/AppIcon-0-0-1x_U007emarketing-0-5-0-0-sRGB-85-220.png/144x144.png
-#!tag=通用重写,网上国网
+#!tag=网上国网,电费查询
 
 [Argument]
-sgcc_enable=swirch,"true","false",tag=重写开关, desc=是否开启接口重写
-CRONEXP=input,"0 9 * * *",tag=Crontab表达式, desc=每天9点执行，可自行修改
-username=input,"",tag=登录账号, desc="https://95598.cn" 或 "网上国网App"登录账号
-password=input,"",tag=登录密码, desc=同账号
-debug=switch,"false","true",tag=是否开启调试模式, desc=排错时建议开启
-show_recent_usage=switch,"false","true",tag=是否展示近期用量, desc=是否展示近期用量
-notify_all_accounts=switch,"false","true",tag=是否通知全部户号, desc=是否通知全部户号
-timeout=input,"60",tag=脚本运行最大时间, desc=单位秒
+sgcc_enable=switch, true, tag=重写开关, desc=是否开启接口重写
+CRONEXP=input, "0 9 * * *", tag=定时规则, desc=默认每天09:00执行
+username=input, "", tag=登录账号, desc=网上国网网站或App登录账号
+password=input, "", tag=登录密码, desc=网上国网登录密码
+debug=switch, true, tag=调试模式, desc=首次测试建议开启
+show_recent_usage=switch, false, tag=展示近期用量, desc=通知中展示近期用电
+notify_all_accounts=switch, false, tag=通知全部户号, desc=多户号时全部通知
+timeout=input, "60", tag=超时时间, desc=脚本最大运行秒数
 
 [Script]
 http-request ^https?:\/\/api\.wsgw-rewrite\.com\/electricity\/bill\/all script-path=https://raw.githubusercontent.com/Timkeltis/SGCC/main/95598-fixed.js, requires-body=true, timeout={timeout}, tag=网上国网接口重写, enable={sgcc_enable}
 
-cron {CRONEXP} script-path=https://raw.githubusercontent.com/Timkeltis/SGCC/main/95598-fixed.js, timeout={timeout}, tag=网上国网-修复版, argument=[{username}, {password}, {debug}, {show_recent_usage}, {notify_all_accounts}]
+cron {CRONEXP} script-path=https://raw.githubusercontent.com/Timkeltis/SGCC/main/95598-fixed.js, timeout={timeout}, tag=网上国网-修复版, argument=[{username},{password},{debug},{show_recent_usage},{notify_all_accounts}]
 
 [MITM]
-hostname = api.wsgw-rewrite.com
+hostname=api.wsgw-rewrite.com
