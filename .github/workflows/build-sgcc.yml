@@ -1,0 +1,35 @@
+name: Build patched SGCC script
+
+on:
+  push:
+    paths:
+      - 'patch_sgcc.py'
+      - '.github/workflows/build-sgcc.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Build patched script
+        run: python patch_sgcc.py
+
+      - name: Commit generated script
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add 95598.js
+          git diff --cached --quiet && exit 0
+          git commit -m "Build patched 95598.js"
+          git push
