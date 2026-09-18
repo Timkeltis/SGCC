@@ -5,9 +5,7 @@
  */
 
 const UPSTREAMS = [
-  "https://fastly.jsdelivr.net/gh/Yuheng0101/X@main/Tasks/95598/95598.js",
-  "https://cdn.jsdelivr.net/gh/Yuheng0101/X@main/Tasks/95598/95598.js",
-  "https://raw.githubusercontent.com/Yuheng0101/X/main/Tasks/95598/95598.js"
+  "https://raw.githubusercontent.com/Timkeltis/SGCC/main/95598.js"
 ];
 const TARGET_RE = /^https:\/\/www\.95598\.cn\/api\/oauth2\/outer\/c02\/f02(?:\?|$)/i;
 const APP_KEY = "7e5b5e84ddad4994b0ebc68dedca4962";
