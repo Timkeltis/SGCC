@@ -86,6 +86,23 @@ Scripting 小组件 → Home Assistant REST API → hass-state-grid → 网上�
 
 > 本项目仅保留原脚本的来源和致谢信息，当前代码、数据链路和 HA 适配均已针对 Scripting 环境重新整理。
 
+## 一键导入 Scripting
+
+在 iPhone 或 iPad 上点击下面的链接，会调用 Scripting 导入本项目：
+
+### [📲 一键导入到 Scripting](scripting://import_scripts?urls=https%3A%2F%2Fgithub.com%2FTimkeltis%2FSGCC%2Farchive%2Frefs%2Fheads%2Fmain.zip)
+
+如果链接没有自动打开，请确认：
+
+1. 设备已安装 Scripting；
+2. 使用 Safari 或 GitHub App 打开本 README；
+3. 点击链接后允许 Scripting 打开；
+4. 导入完成后运行 `index.tsx`，在设置页填写 Home Assistant 地址和 Token。
+
+> 一键导入只负责把项目导入 Scripting，不会自动填写 Home Assistant Token。Token 必须在 Scripting 设置页手动输入，并且不要写入公开仓库。
+
+## Home Assistant 准备
+
 请先确认：
 
 1. Home Assistant 已安装 `hass-state-grid`；
