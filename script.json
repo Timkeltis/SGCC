@@ -1,5 +1,5 @@
 {
-  "version": "1.3.0-ha",
+  "version": "1.4.0-ha",
   "name": "SGCC_Mod",
   "contributors": [
     {
@@ -42,5 +42,5 @@
   "color": "rgba(0, 112, 107, 1)",
   "icon": "bolt.circle",
   "permissions": null,
-  "description": "网上国网电费中号小组件（Home Assistant 版）。通过 DDNSTO 访问 Home Assistant 的 hass-state-grid 实体，不再依赖 Loon/Surge/wsgw 重写；保留原有三栏、阶梯电量、近日用电图表、多户与缓存功能。"
+  "description": "网上国网电费中号小组件（Home Assistant 版）。从设置页填写 Home Assistant 地址和 Long-Lived Access Token，通过 hass-state-grid 获取数据；不需要 Loon、Surge、Quantumult X、BoxJs、MITM、重写订阅或网上国网账号密码。"
 }
