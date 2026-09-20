@@ -88,11 +88,13 @@ Scripting 小组件 → Home Assistant REST API → hass-state-grid → 网上�
 
 ## 一键导入 Scripting
 
-在 iPhone 或 iPad 上点击下面的链接，会调用 Scripting 导入本项目：
+在 iPhone 或 iPad 上点击下面的链接，会打开安装页，再由安装页调用 Scripting 导入本项目：
 
-### [📲 一键导入到 Scripting](scripting://import_scripts?urls=%5B%22https%3A%2F%2Fgithub.com%2FTimkeltis%2FSGCC%2Farchive%2Frefs%2Fheads%2Fmain.zip%22%5D)
+### [📲 一键导入到 Scripting](https://cdn.jsdelivr.net/gh/Timkeltis/SGCC@main/install.html)
 
-如果链接没有自动打开，请复制下面这个完整链接到 Safari 地址栏打开：
+说明：GitHub README 会过滤 `scripting://` 这类 App URL Scheme，不能直接在 README 里做真正可点击的一键导入。因此这里使用一个 HTTPS 安装页中转，安装页再打开 Scripting。
+
+如果安装页没有自动打开 Scripting，请点击安装页中的「打开 Scripting 并导入」按钮，或复制下面这个完整链接到 Safari 地址栏打开：
 
 ```text
 scripting://import_scripts?urls=%5B%22https%3A%2F%2Fgithub.com%2FTimkeltis%2FSGCC%2Farchive%2Frefs%2Fheads%2Fmain.zip%22%5D
