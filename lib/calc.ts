@@ -66,13 +66,13 @@ export function sumCurrentMonth(dayEle: DayEle[], monthEle: MonthEle[]): number 
 }
 
 /**
- * 阶梯阀值。默认山东口径：按月 210/400 度，按年累计 2520/4800 度（= 210×12 / 400×12）。
+ * 阶梯阈值。默认北京居民口径：按月 240/400 度，按年累计 2880/4800 度（= 240×12 / 400×12）。
  * 各地档位略有差异，可在设置里用 step2/step3 覆盖。
  */
 export function stepThresholds(mode: SGCCSettings['stepMode'] = '年'): { step2: number; step3: number } {
   return mode === '月'
-    ? { step2: 210, step3: 400 }
-    : { step2: 2520, step3: 4800 }
+    ? { step2: 240, step3: 400 }
+    : { step2: 2880, step3: 4800 }
 }
 
 /**
