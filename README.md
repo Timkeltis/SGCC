@@ -1,35 +1,34 @@
-# 网上国网 HA 小组件（Scripting）
+# 网上国网小组件（Scripting + NAS API / HA）
 
 在 iOS 桌面展示网上国网用电量、电费、余额、日用电和阶梯电量的 `systemMedium` 小组件。
 
-## 获取方式说明
+## 数据链路
 
-本项目已经改为通过 **Home Assistant REST API** 获取数据。
-
-不再需要：
-
-- Loon
-- Surge
-- Quantumult X
-- BoxJs
-- MITM
-- 重写订阅
-- 国网账号密码
-
-你只需要准备：
-
-1. 已安装并运行 `hass-state-grid` 的 Home Assistant；
-2. Home Assistant 的访问地址；
-3. Home Assistant 的 Long-Lived Access Token。
-
-数据链路为：
+默认链路：
 
 ```text
-Scripting 小组件 → Home Assistant REST API → hass-state-grid → 网上国网数据
+Scripting 小组件 → NAS SGCC API → 网上国网 App 数据接口
 ```
+
+回退链路：
+
+```text
+NAS API 失败且 HA 配置完整 → Home Assistant REST API → hass-state-grid
+```
+
+推荐使用 NAS SGCC API：网上国网账号、密码、登录会话和设备状态全部保存在 NAS；Scripting 只保存 NAS API Base URL 和 API Token。Home Assistant 仍保留为备用数据源。
+
+## 不再需要
+
+- Loon / Surge / Quantumult X；
+- BoxJs；
+- MITM；
+- 重写订阅；
+- 在 Scripting 中保存网上国网账号密码。
 
 ## 功能
 
+- 默认 NAS SGCC API 取数，失败时自动回退 HA；
 - 右侧三栏自由配置；
 - 阶梯电量、当前档位进度和进度条；
 - 近 N 日用电柱状图；
@@ -37,8 +36,8 @@ Scripting 小组件 → Home Assistant REST API → hass-state-grid → 网上�
 - 账户余额和待缴电费；
 - 多账户、多户名；
 - 桌面多个小组件通过参数分别显示不同账户；
-- 可设置自动刷新间隔；
-- 每次小组件实际运行都会直接请求 HA，不使用旧缓存冒充最新数据。
+- 可设置自动刷新建议间隔；
+- 默认北京居民阶梯规则。
 
 ## 原脚本来源与本项目改动
 
@@ -49,42 +48,37 @@ Scripting 小组件 → Home Assistant REST API → hass-state-grid → 网上�
 - 原参考项目：https://github.com/anker1209
 - Scripting 移植及后续维护：本项目维护者
 
-在原脚本基础上，本项目主要进行了以下改动：
+主要改动：
 
 1. **更换数据获取方式**
-   - 原脚本依赖 Loon、Surge、Quantumult X、BoxJs、MITM 和重写订阅；
-   - 现在改为直接请求 Home Assistant REST API；
-   - 通过 `hass-state-grid` 获取网上国网实体；
-   - 不再需要网上国网账号密码或代理重写。
+   - 原脚本依赖代理重写和 BoxJs；
+   - 现在推荐通过 NAS SGCC API 获取数据；
+   - 保留 Home Assistant / hass-state-grid 作为备用链路；
+   - Scripting 不保存网上国网账号密码。
 
-2. **增加 HA 配置方式**
-   - 设置页输入 Home Assistant 地址；
-   - 设置页输入 Long-Lived Access Token；
-   - Token 不再硬编码在源码中；
-   - 限制重定向只能留在同一 HA 地址。
+2. **增加安全配置方式**
+   - 设置页输入 NAS API Base URL；
+   - 设置页输入 NAS API Token；
+   - 可选填写 HA 地址和 HA Long-Lived Access Token 作为备用；
+   - Token 不写入源码。
 
-3. **更新小组件刷新机制**
-   - 每次小组件实际运行都会直接请求 HA；
+3. **优化小组件刷新机制**
+   - 每次小组件实际运行都会联网请求当前数据源；
+   - NAS 失败后自动尝试 HA；
    - 请求失败重试后显示错误；
-   - 不使用旧缓存冒充最新数据；
-   - 支持设置自动刷新建议间隔。
+   - 本地缓存仅用于排障，不用于冒充最新数据。
 
 4. **修正阶梯电量和百分比**
    - 默认阶梯规则改为北京居民口径；
    - 年度默认阈值为 2880 / 4800 度；
    - 月度默认阈值为 240 / 400 度；
    - 修正阈值等号边界；
-   - 支持当前阶梯内百分比；
-   - 增加阈值合法性校验。
+   - 支持当前阶梯内百分比。
 
-5. **优化小组件显示和稳定性**
+5. **优化显示和稳定性**
    - 保留并扩展原三栏布局；
    - 支持多账户、多户名和桌面参数选户；
-   - 支持日用电图表、余额、待缴电费和年度数据；
-   - 优化 HA 请求超时与重试；
    - Logo 改为本地读取，减少额外网络请求。
-
-> 本项目仅保留原脚本的来源和致谢信息，当前代码、数据链路和 HA 适配均已针对 Scripting 环境重新整理。
 
 ## 一键导入 Scripting
 
@@ -96,29 +90,43 @@ Scripting 小组件 → Home Assistant REST API → hass-state-grid → 网上�
 
 如果安装页没有自动打开 Scripting，请点击安装页中的「打开 Scripting 并导入」按钮，或复制下面这个完整链接到 Safari 地址栏打开。
 
-> 使用前需要在仓库设置中开启 GitHub Pages：`Settings → Pages → Deploy from a branch → main / root`。启用后安装页地址为 `https://timkeltis.github.io/SGCC/install.html`。
-
 ```text
 scripting://import_scripts?urls=%5B%22https%3A%2F%2Fgithub.com%2FTimkeltis%2FSGCC%2Farchive%2Frefs%2Fheads%2Fmain.zip%22%5D
 ```
 
-如果仍然无法打开，请确认：
+> 一键导入只负责把项目导入 Scripting，不会自动填写 NAS API Token 或 HA Token。
 
-1. 设备已安装 Scripting；
-2. 使用 Safari 或 GitHub App 打开本 README；
-3. 点击链接后允许 Scripting 打开；
-4. 导入完成后运行 `index.tsx`，在设置页填写 Home Assistant 地址和 Token。
+## NAS SGCC API 准备
 
-> 一键导入只负责把项目导入 Scripting，不会自动填写 Home Assistant Token。Token 必须在 Scripting 设置页手动输入，并且不要写入公开仓库。
+当前推荐生产部署为飞牛 NAS Python 3.12 虚拟环境，详见 [`API.md`](API.md)。Scripting 侧只需要：
 
-## Home Assistant 准备
+```text
+NAS API Base URL: https://pjqj69wa.kooldns.cn
+NAS API Token: NAS .env 中的 SGCC_API_TOKEN
+```
 
-请先确认：
+健康检查：
 
-1. Home Assistant 已安装 `hass-state-grid`；
+```text
+GET https://pjqj69wa.kooldns.cn/health
+```
+
+数据接口由代码自动拼接：
+
+```text
+POST /v1/electricity/bill/all
+```
+
+不要把 NAS `.env` 中的网上国网账号密码写入 Scripting 或 GitHub。
+
+## Home Assistant 备用链路
+
+如需 HA 回退，请确认：
+
+1. Home Assistant 已安装并运行 `hass-state-grid`；
 2. `hass-state-grid` 已成功获取网上国网数据；
 3. Home Assistant 可以从当前设备访问；
-4. 已创建一个 Long-Lived Access Token。
+4. 已创建 Home Assistant Long-Lived Access Token。
 
 创建 Token 的位置通常为：
 
@@ -126,27 +134,23 @@ scripting://import_scripts?urls=%5B%22https%3A%2F%2Fgithub.com%2FTimkeltis%2FSGC
 Home Assistant → 用户头像 → 长期访问令牌 → 创建令牌
 ```
 
-Token 只需要用于读取实体状态。不要把 Token 写入公开代码、README、截图或聊天记录。
-
 ## 安装和首次配置
 
 1. 将项目导入 Scripting 的脚本目录；
 2. 运行 `index.tsx` 打开设置页；
-3. 在「Home Assistant 地址」中填写地址，例如：
+3. 数据源保持默认：`NAS 优先，失败回退 HA`；
+4. 填写 NAS API Base URL，例如：
 
    ```text
-   https://ha.example.com
+   https://pjqj69wa.kooldns.cn
    ```
 
-   也支持填写带 `/api` 或 `/api/states` 的地址，脚本会自动整理。
-
-4. 在「Home Assistant Token」中填写 Long-Lived Access Token；
-5. 点击右上角「保存」；
-6. 点击「获取账户列表」验证连接；
-7. 选择默认账户并保存；
-8. 在桌面添加 `systemMedium` 小组件。
-
-地址和 Token 保存在 Scripting 的脚本配置中，不写入源码。请求失败时不会显示旧缓存数据，而是显示错误提示。
+5. 填写 NAS API Token；
+6. 如需回退 HA，继续填写 Home Assistant 地址和 Token；
+7. 点击右上角「保存」；
+8. 点击「获取账户列表」验证连接；
+9. 选择默认账户并保存；
+10. 在桌面添加 `systemMedium` 小组件。
 
 ## 桌面多个小组件
 
@@ -160,16 +164,19 @@ Token 只需要用于读取实体状态。不要把 Token 写入公开代码、R
 
 | 设置 | 说明 |
 |---|---|
-| Home Assistant 地址 | HA 的访问地址 |
-| Home Assistant Token | HA Long-Lived Access Token |
-| 获取账户列表 | 从 HA 获取当前发现的国网账户和户列表 |
+| 数据源 | 默认 NAS 优先，失败回退 HA；也可手动选择 Home Assistant |
+| NAS API Base URL | NAS API 根地址，例如 `https://pjqj69wa.kooldns.cn` |
+| NAS API Token | NAS `.env` 中的 `SGCC_API_TOKEN`，不要提交到 GitHub |
+| Home Assistant 地址 | HA 的访问地址；仅作为回退链路需要 |
+| Home Assistant Token | HA Long-Lived Access Token；仅作为回退链路需要 |
+| 获取账户列表 | 按当前数据源获取账户列表；NAS 失败可回退 HA |
 | 当前账户 | 默认显示的账户下标，从 0 开始 |
 | 刷新间隔 | 自动刷新建议间隔：60 分钟至 24 小时 |
 | 户 1/2/3 名称 | 给不同户设置易识别的名称 |
 | 柱状图天数 | 近 5–14 日用电 |
 | 阶梯百分比 | 全量比例或当前阶梯内进度 |
 | 第二/三档阈值 | 自定义阶梯阈值；留空使用默认口径 |
-| 清除缓存 | 清理本地诊断缓存；正常显示不依赖缓存 |
+| 清除缓存 | 清理本地诊断缓存 |
 | 预览小组件 | 真实数据联网，演示数据不联网 |
 
 ## 阶梯口径
@@ -183,17 +190,27 @@ Token 只需要用于读取实体状态。不要把 Token 写入公开代码、R
 
 ## 自动刷新说明
 
-小组件每次被 iOS 实际唤醒时，都会直接请求 Home Assistant。设置的刷新间隔是 WidgetKit 的刷新建议时间，不是精确计时器。iOS 可能因为省电、后台刷新预算或系统负载延迟执行。
-
-如果 HA 请求失败，脚本会重试后显示错误，不会继续显示旧数据冒充最新数据。
+小组件每次被 iOS 实际唤醒时，都会按数据源设置联网请求。设置的刷新间隔是 WidgetKit 的刷新建议时间，不是精确计时器。iOS 可能因为省电、后台刷新预算或系统负载延迟执行。
 
 ## 故障排查
 
-### 显示未填写地址或 Token
+### NAS API Token 或网上国网认证失败
 
-回到设置页填写 Home Assistant 地址和 Token，点击「保存」后再点「获取账户列表」。
+通常对应 HTTP 401。检查：
 
-### 返回 HTML 而不是 JSON
+- Scripting 中 NAS API Token 是否正确；
+- NAS `.env` 中 `SGCC_API_TOKEN` 是否一致；
+- NAS 端网上国网账号登录状态是否正常。
+
+### 网上国网要求设备验证
+
+通常对应 HTTP 409。需要在 NAS 端处理设备验证，Scripting 不负责网上国网登录流程。
+
+### NAS 返回 502 / 503
+
+通常是网上国网上游异常、网络问题或 NAS 到国网接口暂时不可用。此时如果 HA 已配置，Scripting 会尝试回退 HA。
+
+### Home Assistant 返回 HTML 而不是 JSON
 
 通常表示反向代理返回了首页或登录页。请确认：
 
@@ -204,12 +221,13 @@ Token 只需要用于读取实体状态。不要把 Token 写入公开代码、R
 
 ### 没有发现国网账户
 
-确认 `hass-state-grid` 已成功生成相应实体，并检查实体状态是否为可用值。
+- NAS 模式：检查 NAS API 返回的 `accounts` 是否为空；
+- HA 模式：检查 `hass-state-grid` 是否生成对应实体。
 
 ## 免责声明
 
-本项目为非官方实现，仅供学习、研究和个人自动化使用。数据请以网上国网官方 App 为准。请自行保护 Home Assistant 地址和 Token，不要在不可信环境中保存或分享凭据。
+本项目为非官方实现，仅供学习、研究和个人自动化使用。数据请以网上国网官方 App 为准。请自行保护 NAS API Token、Home Assistant Token 和网上国网账号信息，不要在不可信环境中保存或分享凭据。
 
 ## 致谢
 
-本项目最初参考并移植了 Scriptable 网上国网脚本的界面和功能思路，保留原作者署名要求。当前数据获取链路、Scripting 适配和 Home Assistant 接入由本项目维护者改造。
+本项目最初参考并移植了 Scriptable 网上国网脚本的界面和功能思路，保留原作者署名要求。当前 NAS API、Home Assistant 适配和 Scripting 小组件由本项目维护者整理维护。
