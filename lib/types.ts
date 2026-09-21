@@ -149,6 +149,12 @@ export type RowDisplayMode = 'group1' | 'group2' | 'group3' | 'step'
 
 /** 组件可配置项 */
 export interface SGCCSettings {
+  /** 数据源：Home Assistant 实体 或 NAS 直连国网 API */
+  dataSource: 'ha' | 'nas-api'
+  /** NAS SGCC API Base URL，例如 https://pjqj69wa.kooldns.cn */
+  nasApiBaseUrl: string
+  /** NAS SGCC API Token；保存于脚本 Storage，不写入源码 */
+  nasApiToken: string
   /** Home Assistant 地址 */
   haUrl: string
   /** Home Assistant Long-Lived Access Token；保存于脚本 Storage，不写入源码 */
@@ -208,6 +214,9 @@ export interface SGCCSettings {
 }
 
 export const DEFAULT_SETTINGS: SGCCSettings = {
+  dataSource: 'nas-api',
+  nasApiBaseUrl: '',
+  nasApiToken: '',
   haUrl: '',
   haToken: '',
   accountIndex: 0,
