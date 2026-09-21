@@ -12,7 +12,8 @@
  * version: 2.3.3
  * update: 2026/08/11
  * 原创UI，修改套用请注明来源
- * 当前版本数据源已改为 Home Assistant + hass-state-grid，不再依赖 wsgw 重写。
+ * 当前版本默认通过 NAS SGCC API 取数；NAS 不可用时可自动回退 Home Assistant / hass-state-grid。
+ * 不再依赖 wsgw 重写。
  */
 import {
   Script,
@@ -33,13 +34,18 @@ import {
   type Color,
 } from 'scripting'
 import { loadSettings, saveSettings, resetSettings } from './lib/store'
-import { listAccounts } from './lib/api'
+import { listAccountsWithSource } from './lib/api'
 import { clearCache } from './lib/cache'
 import { DEFAULT_SETTINGS, type SGCCSettings, type MetricKey, type RowDisplayMode } from './lib/types'
 
 type Account = { index: number; consNo: string; consName: string }
 
 type PatchFn = <K extends keyof SGCCSettings>(key: K, value: SGCCSettings[K]) => void
+
+const loadingLabel = (settings: SGCCSettings): string =>
+  settings.dataSource === 'nas-api'
+    ? '正在通过 NAS SGCC API 获取账户，失败将自动回退 HA…'
+    : '正在通过 Home Assistant 获取账户…'
 
 /** 行显示模式选项 */
 const ROW_MODES = [
@@ -168,11 +174,14 @@ function SettingsView() {
   const loadAccountList = async () => {
     if (loading) return
     setLoading(true)
-    setStatus('正在从 Home Assistant 获取账户…')
+    // 获取账户时使用当前页面上的设置，并顺手保存，避免刚改完数据源/Token 还没点保存时仍按旧配置请求。
+    saveSettings(settings)
+    setStatus(loadingLabel(settings))
     try {
-      const list = await listAccounts(loadSettings())
+      const result = await listAccountsWithSource(settings)
+      const list = result.accounts
       setAccounts(list)
-      setStatus(`已获取 ${list.length} 个账户`)
+      setStatus(`已通过 ${result.source} 获取 ${list.length} 个账户`)
     } catch (e) {
       setStatus(`获取失败：${e instanceof Error ? e.message : e}`)
     } finally {
@@ -194,7 +203,7 @@ function SettingsView() {
           header={<Text>账户</Text>}
           footer={
             <Text font="caption">
-              多户时选择要显示的账户。需先点击「获取账户列表」。
+              多户时选择要显示的账户。点击「获取账户列表」会按当前数据源请求：默认 NAS 优先，失败自动回退 HA。
             </Text>
           }
         >
@@ -381,10 +390,31 @@ function SettingsView() {
           header={<Text>数据</Text>}
           footer={
             <Text font="caption">
-              通过 Home Assistant REST API 获取国家电网数据；每次小组件运行都会直接请求 HA，失败时显示错误，不使用旧缓存。
+              默认优先通过 NAS SGCC API 获取国家电网数据；NAS 走不通且 Home Assistant 配置完整时自动回退 HA。
             </Text>
           }
         >
+          <Picker
+            title="数据源"
+            value={settings.dataSource === 'nas-api' ? 1 : 0}
+            onChanged={(v: number) => patch('dataSource', v === 1 ? 'nas-api' : 'ha')}
+            pickerStyle="menu"
+          >
+            <Text tag={0}>Home Assistant</Text>
+            <Text tag={1}>NAS 优先，失败回退 HA</Text>
+          </Picker>
+          <TextField
+            title="NAS API Base URL"
+            prompt="例如 https://pjqj69wa.kooldns.cn"
+            value={settings.nasApiBaseUrl}
+            onChanged={v => patch('nasApiBaseUrl', v.trim())}
+          />
+          <TextField
+            title="NAS API Token"
+            prompt="SGCC_API_TOKEN"
+            value={settings.nasApiToken}
+            onChanged={v => patch('nasApiToken', v.trim())}
+          />
           <TextField
             title="Home Assistant 地址"
             prompt="例如 https://ha.example.com"
@@ -424,7 +454,7 @@ function SettingsView() {
           header={<Text>预览</Text>}
           footer={
             <Text font="caption">
-              预览页顶部可切换参数：「真实数据」读取 Home Assistant（读取的是已保存的设置，改动后请先点「保存」），「演示数据」不联网、用于校对布局。
+              预览页顶部可切换参数：「真实数据」按已保存的数据源设置读取（默认 NAS，失败可回退 HA），「演示数据」不联网、用于校对布局。
             </Text>
           }
         >
