@@ -1,6 +1,6 @@
 /**
  * 网上国网 Loon 兼容修复包装器
- * - 优先从 jsDelivr 加载上游 95598.js，失败再回退 GitHub Raw
+ * - 从 Timkeltis/SGCC 加载仓库内的修正版 95598.js
  * - 仅规范 /api/oauth2/outer/c02/f02 请求
  */
 
