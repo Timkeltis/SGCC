@@ -1,5 +1,5 @@
 {
-  "version": "1.4.0-ha",
+  "version": "1.5.0-nas",
   "name": "SGCC_Mod",
   "contributors": [
     {
@@ -24,7 +24,7 @@
     "ja": "",
     "es": "",
     "it": "",
-    "zh": "网上国网 HA",
+    "zh": "网上国网 NAS",
     "pt": "",
     "fr": "",
     "en": "",
@@ -42,5 +42,5 @@
   "color": "rgba(0, 112, 107, 1)",
   "icon": "bolt.circle",
   "permissions": null,
-  "description": "网上国网电费中号小组件（Home Assistant 版）。从设置页填写 Home Assistant 地址和 Long-Lived Access Token，通过 hass-state-grid 获取数据；不需要 Loon、Surge、Quantumult X、BoxJs、MITM、重写订阅或网上国网账号密码。"
+  "description": "网上国网电费中号小组件。默认通过 NAS SGCC API 直连网上国网数据，NAS 不可用且已配置 Home Assistant 时自动回退 HA / hass-state-grid；Scripting 只保存 NAS API Token 或 HA Token，不保存网上国网账号密码。"
 }
