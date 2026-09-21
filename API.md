@@ -2,7 +2,35 @@
 
 此服务把网上国网 App 数据层直接部署在 NAS 上。账号密码只放在 NAS 的 `.env`，调用端只需要 API Token。
 
-## 本地启动
+## 方式一：飞牛应用商店 Python（推荐）
+
+在飞牛应用商店安装 Python 3.12，然后在 NAS 终端执行：
+
+```bash
+cd /vol1/1000/Disk1/docker/sgcc
+python3 -m venv .venv
+.venv/bin/pip install -r requirements-api.txt
+cp .env.example .env
+# 编辑 .env，填写网上国网账号和 SGCC_API_TOKEN
+chmod +x start-api.sh stop-api.sh
+PYTHON_BIN="$PWD/.venv/bin/python" ./start-api.sh
+```
+
+查看运行日志：
+
+```bash
+tail -f data/service.log
+```
+
+停止服务：
+
+```bash
+./stop-api.sh
+```
+
+服务监听 NAS 的 `PORT`（默认 `8080`）。如果需要映射到 NAS 的 `18080`，请在 `.env` 中设置 `PORT=18080`。
+
+## 方式二：Docker
 
 ```bash
 cp .env.example .env
