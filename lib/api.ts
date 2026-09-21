@@ -1,17 +1,20 @@
 /**
- * 取数：直接读取 Home Assistant REST API 中的国家电网实体。
- * 数据链路：Scripting -> DDNSTO -> Home Assistant -> hass-state-grid。
+ * 取数：默认请求 NAS SGCC API；NAS 不可用时自动回退 Home Assistant。
+ * 数据链路：Scripting -> NAS SGCC API -> 网上国网 App 数据接口；
+ * 回退链路：Scripting -> Home Assistant -> hass-state-grid。
  *
- * 该版本不再依赖 Loon / Surge / wsgw 重写。
+ * Scripting 只保存 NAS API Base URL / API Token 或 HA 地址 / Token，不保存网上国网账号密码。
  */
 import { fetch } from 'scripting'
 import { writeCache } from './cache'
 import { buildViewModel, nowString } from './calc'
 import type { BillViewModel, RawAccount, SGCCSettings } from './types'
 
-const CACHE_KEY = 'BillData_HA.json'
+const CACHE_KEY = 'BillData_SGCC.json'
 const TIMEOUT_SEC = 15
 const MAX_ATTEMPTS = 2
+
+type DataSourceName = 'NAS SGCC API' | 'Home Assistant'
 
 type HAState = {
   entity_id?: string
@@ -21,6 +24,38 @@ type HAState = {
   last_updated?: string
 }
 
+type NasApiAccount = {
+  account?: {
+    id?: string
+    name?: string
+    cons_no?: string
+    masked_number?: string
+    province?: string
+    address?: string
+  }
+  daily?: Array<{ day?: string; usage?: number | string | null; charge?: number | string | null }>
+  latest?: { day?: string; usage?: number | string | null; charge?: number | string | null } | null
+  current_month_total?: number | string | null
+  current_year_usage?: number | string | null
+  current_year_charge?: number | string | null
+  monthly_bills?: Array<{ month?: string; usage?: number | string | null; charge?: number | string | null }>
+  balance?: {
+    balance?: number | string | null
+    amount_due?: number | string | null
+    history_owe?: number | string | null
+    date?: string
+  } | null
+  meter?: unknown
+}
+
+type NasApiResponse = {
+  ok?: boolean
+  source?: string
+  refresh_time?: string
+  accounts?: NasApiAccount[]
+  data?: Record<string, NasApiAccount>
+  error?: string
+}
 type AccountEntities = {
   key: string
   suffix: string
@@ -33,6 +68,14 @@ type AccountEntities = {
   yearCharge?: HAState
   balance?: HAState
   amountDue?: HAState
+}
+
+function normalizeNasBaseUrl(url: string): string {
+  return url
+    .trim()
+    .replace(/\/+$/, '')
+    .replace(/\/v1\/electricity\/bill\/all$/i, '')
+    .replace(/\/health$/i, '')
 }
 
 function cleanBaseUrl(url: string): string {
@@ -327,29 +370,184 @@ async function requestOnce(settings: SGCCSettings): Promise<RawAccount[]> {
   return accounts
 }
 
+function formatNasUpdate(value?: string): string {
+  if (!value) return nowString()
+  const d = new Date(value)
+  if (!Number.isFinite(d.getTime())) return formatUpdate(value)
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
+}
+
+function toNasRawAccount(item: NasApiAccount, index: number, refreshTime?: string): RawAccount {
+  const account = item.account ?? {}
+  const daily = Array.isArray(item.daily) ? item.daily : []
+  const monthly = Array.isArray(item.monthly_bills) ? item.monthly_bills : []
+  const currentMonth = asNumber(item.current_month_total) ?? 0
+  const yearUsage = asNumber(item.current_year_usage) ?? 0
+  const yearCharge = asNumber(item.current_year_charge) ?? 0
+  const latestUsage = asNumber(item.latest?.usage)
+  const balance = item.balance ?? null
+  const amountDue = asNumber(balance?.amount_due)
+  const accountBalance = asNumber(balance?.balance)
+  const isPostPaid = amountDue != null
+  const displayNo = account.masked_number || account.cons_no || account.id || `NAS-${index + 1}`
+  const displayName = account.name || account.address || `国家电网 ${displayNo}`
+
+  const dayList = daily
+    .map(row => {
+      const day = dateCompact(row.day)
+      const usage = asNumber(row.usage)
+      return day && usage != null ? { day, dayElePq: String(usage) } : null
+    })
+    .filter((row): row is { day: string; dayElePq: string } => row != null)
+    .sort((a, b) => b.day.localeCompare(a.day))
+
+  if (dayList.length === 0 && item.latest?.day && latestUsage != null) {
+    const day = dateCompact(item.latest.day)
+    if (day) dayList.push({ day, dayElePq: String(latestUsage) })
+  }
+
+  const monthList = monthly
+    .map(row => {
+      const month = monthCompact(row.month)
+      const usage = asNumber(row.usage)
+      const charge = asNumber(row.charge)
+      return month
+        ? { month, monthEleNum: String(usage ?? 0), monthEleCost: String(charge ?? 0) }
+        : null
+    })
+    .filter((row): row is { month: string; monthEleNum: string; monthEleCost: string } => row != null)
+    .sort((a, b) => a.month.localeCompare(b.month))
+
+  const eleBill: RawAccount['eleBill'] = {
+    date: formatNasUpdate(balance?.date || refreshTime),
+    sumMoney: isPostPaid ? (amountDue ?? 0) : (accountBalance ?? 0),
+  }
+  if (isPostPaid) eleBill.accountBalance = accountBalance ?? 0
+
+  return {
+    userInfo: {
+      consNo_dst: String(displayNo),
+      consName_dst: String(displayName),
+    },
+    arrearsOfFees: isPostPaid && (amountDue ?? 0) > 0,
+    eleBill,
+    dayElecQuantity31: { sevenEleList: dayList },
+    monthElecQuantity: {
+      mothEleList: monthList,
+      dataInfo: {
+        // calc.ts 会加上 haCurrentMonthUsage；NAS API 的年度账单为已结算月合计，保持现有口径。
+        totalEleNum: yearUsage,
+        totalEleCost: yearCharge,
+      },
+    },
+    stepElecQuantity: [{ electricParticulars: { totalYearPq: yearUsage } }],
+    haCurrentMonthUsage: currentMonth,
+    haLatestDailyUsage: latestUsage ?? undefined,
+  }
+}
+
+function hasUsefulUsageData(account: RawAccount): boolean {
+  const currentMonth = account.haCurrentMonthUsage ?? 0
+  const latestDaily = account.haLatestDailyUsage ?? 0
+  const yearUsage = Number(account.monthElecQuantity?.dataInfo?.totalEleNum ?? 0)
+  const dayCount = account.dayElecQuantity31?.sevenEleList?.length ?? 0
+  const monthCount = account.monthElecQuantity?.mothEleList?.length ?? 0
+  return currentMonth > 0 || latestDaily > 0 || yearUsage > 0 || dayCount > 0 || monthCount > 0
+}
+
+async function requestNasApi(settings: SGCCSettings): Promise<RawAccount[]> {
+  const baseUrl = normalizeNasBaseUrl(settings.nasApiBaseUrl)
+  const token = settings.nasApiToken.trim().replace(/^Bearer\s+/i, '').replace(/^['"]|['"]$/g, '').trim()
+  if (!baseUrl || !token) throw new Error('请先在设置页填写 NAS API 地址和 Token')
+  const endpoint = `${baseUrl}/v1/electricity/bill/all`
+  console.log(`请求 NAS SGCC API：${endpoint}`)
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-cache',
+    },
+    body: JSON.stringify({}),
+    timeout: TIMEOUT_SEC,
+  })
+
+  const body = (await res.text()).replace(/^\uFEFF/, '').trim()
+  if (!res.ok) {
+    const statusText = res.status === 401
+      ? 'API Token 或网上国网认证失败'
+      : res.status === 409
+        ? '网上国网要求设备验证，请在 NAS 端处理'
+        : res.status === 502
+          ? '网上国网上游接口异常'
+          : res.status === 503
+            ? '网上国网暂时无法访问，请稍后重试'
+            : `NAS API HTTP ${res.status}`
+    throw new Error(`${statusText}${body ? `：${body.slice(0, 120)}` : ''}`)
+  }
+  if (!body || body.startsWith('<')) throw new Error(`NAS API 返回的不是 JSON：${body.slice(0, 80)}`)
+
+  let json: NasApiResponse
+  try {
+    json = JSON.parse(body) as NasApiResponse
+  } catch {
+    throw new Error(`NAS API JSON 解析失败：${body.slice(0, 120)}`)
+  }
+  if (json.ok === false) throw new Error(`NAS API 返回失败：${json.error ?? 'unknown error'}`)
+  const accounts = Array.isArray(json.accounts)
+    ? json.accounts
+    : json.data && typeof json.data === 'object'
+      ? Object.values(json.data)
+      : []
+  if (accounts.length === 0) throw new Error('NAS API 未返回账户数据')
+  const raw = accounts.map((item, index) => toNasRawAccount(item, index, json.refresh_time))
+  if (!raw.some(hasUsefulUsageData)) throw new Error('NAS API 未返回有效用电数据')
+  return raw
+}
+
+function hasHaSettings(settings: SGCCSettings): boolean {
+  return !!settings.haUrl.trim() && !!settings.haToken.trim()
+}
+
 async function fetchAccounts(
   settings: SGCCSettings,
-): Promise<{ accounts: RawAccount[]; fromCache: boolean; age: number }> {
-  // 实时模式：每次脚本运行都直接请求 HA，不读取本地缓存作为数据源。
-  // 本地缓存仅保留用于排障，不参与正常展示，避免任何时候显示旧数据。
+): Promise<{ accounts: RawAccount[]; fromCache: boolean; age: number; source: DataSourceName }> {
+  // 默认 NAS SGCC API 优先；NAS 不可用时，如果 HA 配置完整，则自动回退 Home Assistant。
   let lastError: unknown = null
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     try {
-      const accounts = await requestOnce(settings)
+      let accounts: RawAccount[]
+      let source: DataSourceName = 'Home Assistant'
+      if (settings.dataSource === 'nas-api') {
+        try {
+          accounts = await requestNasApi(settings)
+          source = 'NAS SGCC API'
+        } catch (nasError) {
+          lastError = nasError
+          console.log(`NAS SGCC API 请求失败，准备回退 Home Assistant：${nasError}`)
+          if (!hasHaSettings(settings)) throw nasError
+          accounts = await requestOnce(settings)
+          source = 'Home Assistant'
+        }
+      } else {
+        accounts = await requestOnce(settings)
+      }
       writeCache(CACHE_KEY, JSON.stringify(accounts))
-      console.log(`Home Assistant 请求成功，共 ${accounts.length} 个户号`)
-      return { accounts, fromCache: false, age: 0 }
+      console.log(`${source} 请求成功，共 ${accounts.length} 个户号`)
+      return { accounts, fromCache: false, age: 0, source }
     } catch (e) {
       lastError = e
-      console.log(`Home Assistant 请求失败（第 ${attempt + 1}/${MAX_ATTEMPTS} 次）：${e}`)
+      console.log(`${settings.dataSource === 'nas-api' ? 'NAS/HA 回退链路' : 'Home Assistant'} 请求失败（第 ${attempt + 1}/${MAX_ATTEMPTS} 次）：${e}`)
       if (attempt + 1 < MAX_ATTEMPTS) {
-        await new Promise(resolve => setTimeout(resolve, 2500))
+        await new Promise<void>(resolve => setTimeout(() => resolve(), 2500))
       }
     }
   }
 
-  // 实时模式下请求失败不回退旧缓存，直接显示错误，保证显示的数据不会冒充最新数据。
-  throw new Error(`无法获取 HA 国家电网最新数据：${lastError instanceof Error ? lastError.message : lastError}`)
+  // 请求失败直接显示错误，保证显示的数据不会冒充最新数据。
+  throw new Error(`无法获取${settings.dataSource === 'nas-api' ? ' NAS SGCC API 或 HA' : ' HA 国家电网'}最新数据：${lastError instanceof Error ? lastError.message : lastError}`)
 }
 
 export async function getBillData(
@@ -374,15 +572,25 @@ export async function getBillData(
   })
 }
 
+export async function listAccountsWithSource(
+  settings: SGCCSettings,
+): Promise<{ source: DataSourceName; accounts: Array<{ index: number; consNo: string; consName: string }> }> {
+  const { accounts, source } = await fetchAccounts(settings)
+  return {
+    source,
+    accounts: accounts.map((item, index) => ({
+      index,
+      consNo: item.userInfo?.consNo_dst ?? '',
+      consName: item.userInfo?.consName_dst ?? `账户 ${index + 1}`,
+    })),
+  }
+}
+
 export async function listAccounts(
   settings: SGCCSettings,
 ): Promise<Array<{ index: number; consNo: string; consName: string }>> {
-  const { accounts } = await fetchAccounts(settings)
-  return accounts.map((item, index) => ({
-    index,
-    consNo: item.userInfo?.consNo_dst ?? '',
-    consName: item.userInfo?.consName_dst ?? `账户 ${index + 1}`,
-  }))
+  const { accounts } = await listAccountsWithSource(settings)
+  return accounts
 }
 
 export { CACHE_KEY }
