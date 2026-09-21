@@ -4,7 +4,7 @@
 - NAS API 失败且 Home Assistant 配置完整时，自动回退 HA / hass-state-grid。
 - 设置页新增 NAS API Base URL 和 NAS API Token；Scripting 不保存网上国网账号密码。
 - Scripting 端将 NAS API 返回的 `accounts` 转换为现有小组件 `RawAccount` 格式，UI 无需大面积改动。
-- 更新 README / API 文档，明确当前飞牛 NAS Python 3.12 虚拟环境部署方式和 `8080` 端口。
+- 更新 README / API 文档，完整补充 Scripting 小组件、飞牛 NAS Python 虚拟环境部署、`.env` 配置、开机任务、外网反代、接口验证和故障排查说明。
 - 删除已废弃的 HA 转 JSON Docker 桥接目录，避免和 NAS SGCC API 方案混淆。
 
 ## 1.4.0-ha
