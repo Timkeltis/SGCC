@@ -1,7 +1,16 @@
+## 1.5.0-nas
+
+- 新增 NAS SGCC API 数据源，默认优先通过 NAS 直连网上国网数据。
+- NAS API 失败且 Home Assistant 配置完整时，自动回退 HA / hass-state-grid。
+- 设置页新增 NAS API Base URL 和 NAS API Token；Scripting 不保存网上国网账号密码。
+- Scripting 端将 NAS API 返回的 `accounts` 转换为现有小组件 `RawAccount` 格式，UI 无需大面积改动。
+- 更新 README / API 文档，明确当前飞牛 NAS Python 3.12 虚拟环境部署方式和 `8080` 端口。
+- 删除已废弃的 HA 转 JSON Docker 桥接目录，避免和 NAS SGCC API 方案混淆。
+
 ## 1.4.0-ha
 
 - 获取方式改为 Home Assistant REST API。
-- 不再需要 Loon、Surge、Quantumult X、BoxJs、MITM、重写订阅或网上国网账号密码。
+- 不再需要 Loon、Surge、Quantumult X、BoxJs、MITM、重写订阅或在 Scripting 中保存网上国网账号密码。
 - 新增设置页输入 Home Assistant 地址和 Long-Lived Access Token。
 - Token 不再硬编码在源码中；请求仅允许同一 HA 地址的重定向。
 - 每次小组件实际运行直接请求 HA，失败重试后显示错误，不使用旧缓存冒充最新数据。
