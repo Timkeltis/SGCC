@@ -3,6 +3,9 @@ set -eu
 
 BASE_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 PID_FILE=${SGCC_DATA_DIR:-"$BASE_DIR/data"}/service.pid
+MANUAL_STOP_MARKER=${SGCC_DATA_DIR:-"$BASE_DIR/data"}/service.manual-stop
+
+touch "$MANUAL_STOP_MARKER"
 
 if [ ! -f "$PID_FILE" ]; then
   echo "SGCC API is not running."

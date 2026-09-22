@@ -48,9 +48,10 @@ SGCC/
 │   └── cache.ts              # 本地诊断缓存
 ├── service.py                # NAS SGCC API 服务入口
 ├── sgcc_client/              # NAS 端网上国网 App 协议客户端
-├── requirements-api.txt      # NAS Python 依赖
 ├── start-api.sh              # NAS API 启动脚本
-├── stop-api.sh               # NAS API 停止脚本
+├── stop-api.sh               # NAS API 手动停止脚本
+├── sgcc-watchdog.sh          # NAS 开机延迟与异常自动重启脚本
+├── requirements-api.txt      # NAS Python 3.12 依赖
 ├── .env.example              # NAS 环境变量模板，不要提交真实 .env
 ├── API.md                    # NAS API 详细部署和接口说明
 ├── install.html              # Scripting 一键导入中转页
@@ -90,8 +91,9 @@ stop-api.sh
 
 ```bash
 cd /vol1/1000/Disk1/docker/sgcc
-python3 -m venv .venv
-.venv/bin/pip install -r requirements-api.txt
+python3.12 -m venv .venv
+.venv/bin/python -m pip install --upgrade pip
+.venv/bin/python -m pip install -r requirements-api.txt
 ```
 
 ### 3. 创建并编辑 `.env`
@@ -130,8 +132,8 @@ PORT=8080
 ### 4. 启动服务
 
 ```bash
-chmod +x start-api.sh stop-api.sh
-PYTHON_BIN="$PWD/.venv/bin/python" ./start-api.sh
+chmod +x start-api.sh stop-api.sh sgcc-watchdog.sh
+./start-api.sh
 ```
 
 查看日志：
@@ -150,13 +152,13 @@ tail -f data/service.log
 
 建议在飞牛 NAS 的开机任务中配置：
 
+在飞牛 NAS 的“开机任务”中只执行一次：
+
 ```bash
-sleep 50
-cd /vol1/1000/Disk1/docker/sgcc
-PYTHON_BIN="$PWD/.venv/bin/python" ./start-api.sh
+nohup /vol1/1000/Disk1/docker/sgcc/sgcc-watchdog.sh >/dev/null 2>&1 &
 ```
 
-推荐策略：
+监督器会等待 50 秒，然后每 10 秒检查 `/health`。服务异常退出时自动执行 `start-api.sh`；执行 `stop-api.sh` 后会写入手动停止标记，监督器不会自动拉起。不要重复创建多个相同的常驻开机任务。
 
 ```text
 飞牛 NAS 开机
@@ -166,7 +168,7 @@ PYTHON_BIN="$PWD/.venv/bin/python" ./start-api.sh
 → 手动 stop-api.sh 停止时不自动拉起
 ```
 
-具体自动重启逻辑由 `start-api.sh` / NAS 开机任务实现。
+自动重启由 `sgcc-watchdog.sh` 实现，`start-api.sh` 只负责启动一次服务。
 
 ### 6. 内网验证
 

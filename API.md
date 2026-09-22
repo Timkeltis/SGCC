@@ -1,34 +1,18 @@
-# NAS SGCC API 部署与接口说明
+# NAS SGCC API 部署说明（飞牛 Python 3.12）
 
-此服务把网上国网 App 数据层部署在 NAS 上。账号、密码、登录会话和设备状态只保存在 NAS；Scripting 只通过 API Token 调用接口。
+本服务直接在飞牛 NAS 的 Python 3.12 虚拟环境中运行，调用网上国网 App 数据协议，并向 Scripting 提供 API。
 
----
+> 本项目当前生产部署不使用 Docker。账号、密码、API Token、登录会话和设备状态只保存在 NAS。
 
-## 1. 当前推荐部署方式
+## 1. 目录与文件
 
-当前推荐生产方式为：
-
-```text
-飞牛 NAS + Python 3.12 虚拟环境 + 开机任务
-```
-
-当前示例目录：
+推荐目录：
 
 ```text
-项目目录：/vol1/1000/Disk1/docker/sgcc
-Python 虚拟环境：/vol1/1000/Disk1/docker/sgcc/.venv
-服务文件：/vol1/1000/Disk1/docker/sgcc/service.py
-数据目录：/vol1/1000/Disk1/docker/sgcc/data
-配置文件：/vol1/1000/Disk1/docker/sgcc/.env
+/vol1/1000/Disk1/docker/sgcc
 ```
 
-真实 `.env`、`data/state.json`、日志文件不要提交到 GitHub。
-
----
-
-## 2. 文件准备
-
-NAS 目录至少需要：
+主要文件：
 
 ```text
 service.py
@@ -37,31 +21,42 @@ requirements-api.txt
 .env.example
 start-api.sh
 stop-api.sh
+sgcc-watchdog.sh
 ```
 
-可选 Docker 文件：
+运行数据：
 
 ```text
-Dockerfile.api
-docker-compose.api.yml
+data/service.log
+data/service.pid
+data/service.manual-stop
+data/state.json
 ```
 
----
+`.env`、`data/` 和 `.venv/` 不得提交到 GitHub。
 
-## 3. Python 虚拟环境安装
+## 2. 安装 Python 3.12 环境
 
 在飞牛 NAS 终端执行：
 
 ```bash
 cd /vol1/1000/Disk1/docker/sgcc
-python3 -m venv .venv
-.venv/bin/pip install -r requirements-api.txt
+python3.12 -m venv .venv
+.venv/bin/python -m pip install --upgrade pip
+.venv/bin/python -m pip install -r requirements-api.txt
+chmod +x start-api.sh stop-api.sh sgcc-watchdog.sh
 ```
 
-依赖文件：
+如果 NAS 的应用商店 Python 3.12 命令名是 `python3`，先确认：
 
-```text
-requirements-api.txt
+```bash
+python3 --version
+```
+
+必须显示 Python 3.12，再执行：
+
+```bash
+python3 -m venv .venv
 ```
 
 当前依赖：
@@ -69,19 +64,16 @@ requirements-api.txt
 ```text
 aiohttp>=3.10,<4
 gmssl>=3.2,<4
+cryptography>=42,<51
 ```
 
----
-
-## 4. 配置 `.env`
-
-创建配置文件：
+## 3. 配置 `.env`
 
 ```bash
 cp .env.example .env
 ```
 
-示例：
+填写：
 
 ```env
 SGCC_API_TOKEN=replace-with-a-long-random-token
@@ -91,40 +83,28 @@ SGCC_HISTORY_MONTHS=2
 PORT=8080
 ```
 
-变量说明：
+说明：
 
-| 变量 | 必填 | 说明 |
-|---|---:|---|
-| `SGCC_API_TOKEN` | 是 | Scripting 调用 NAS API 的 Bearer Token，建议使用长随机字符串 |
-| `SGCC_USERNAME` | 是 | 网上国网登录手机号 |
-| `SGCC_PASSWORD` | 是 | 网上国网登录密码 |
-| `SGCC_HISTORY_MONTHS` | 否 | 查询最近几个月日用电，默认 2，建议 1–3 |
-| `PORT` | 否 | 服务监听端口，当前推荐 8080 |
+| 变量 | 说明 |
+|---|---|
+| `SGCC_API_TOKEN` | Scripting 调用 NAS API 的 Bearer Token |
+| `SGCC_USERNAME` | 网上国网登录手机号，只保存在 NAS |
+| `SGCC_PASSWORD` | 网上国网登录密码，只保存在 NAS |
+| `SGCC_HISTORY_MONTHS` | 查询最近几个月数据，默认 2，范围 1–3 |
+| `PORT` | API 监听端口，默认 8080 |
 
-安全要求：
+不要将真实 `.env`、账号、密码、Token 或 `data/state.json` 提交到 GitHub。
 
-- `.env` 只保存在 NAS；
-- 不要把 `.env` 上传到 GitHub；
-- 不要把 `SGCC_USERNAME` / `SGCC_PASSWORD` 填进 Scripting；
-- 不要把 `SGCC_API_TOKEN` 写进 README 或截图；
-- 不要删除 `data/state.json`，否则可能触发网上国网重新登录或设备验证。
-
----
-
-## 5. 启动与停止
-
-赋权：
-
-```bash
-chmod +x start-api.sh stop-api.sh
-```
+## 4. 手动启动与停止
 
 启动：
 
 ```bash
 cd /vol1/1000/Disk1/docker/sgcc
-PYTHON_BIN="$PWD/.venv/bin/python" ./start-api.sh
+./start-api.sh
 ```
+
+启动脚本会强制使用 Python 3.12 和当前 `.venv` 的依赖。如果健康检查已经正常，会直接退出，不会重复占用端口。
 
 停止：
 
@@ -132,324 +112,185 @@ PYTHON_BIN="$PWD/.venv/bin/python" ./start-api.sh
 ./stop-api.sh
 ```
 
+`stop-api.sh` 会写入：
+
+```text
+data/service.manual-stop
+```
+
+监督器看到此标记后不会自动拉起服务。
+
+恢复自动运行：
+
+```bash
+./start-api.sh
+```
+
+显式执行 `start-api.sh` 会清除手动停止标记。
+
 查看日志：
 
 ```bash
 tail -f data/service.log
 ```
 
-服务监听：
+不要删除：
 
 ```text
-0.0.0.0:8080
+data/state.json
 ```
 
----
+其中保存设备状态和网上国网登录会话，删除后可能触发重新登录或设备验证。
 
-## 6. 飞牛开机任务
+## 5. 飞牛 NAS 开机任务与自动重启
 
-建议在飞牛 NAS 开机任务中配置：
+在飞牛 NAS 的“开机任务”中只配置一次以下命令：
 
 ```bash
-sleep 50
-cd /vol1/1000/Disk1/docker/sgcc
-PYTHON_BIN="$PWD/.venv/bin/python" ./start-api.sh
+nohup /vol1/1000/Disk1/docker/sgcc/sgcc-watchdog.sh >/dev/null 2>&1 &
 ```
 
-推荐逻辑：
+`sgcc-watchdog.sh` 的行为：
 
 ```text
-飞牛 NAS 开机
+NAS 开机任务启动
 → 等待 50 秒
-→ 启动 SGCC API
-→ 服务异常退出后自动重启
-→ 手动 stop-api.sh 停止时不自动拉起
+→ 检查 /health
+→ 服务未运行时执行 start-api.sh
+→ 每 10 秒检查一次
+→ 服务异常退出后自动启动
+→ 手动 stop-api.sh 后保持停止
 ```
 
-如果你自己改 `start-api.sh`，建议保留：
+监督器使用锁目录避免重复启动：
 
-- pid 文件；
-- 日志输出到 `data/service.log`；
-- 异常退出自动拉起；
-- 手动停止标记。
+```text
+data/sgcc-watchdog.lock
+```
 
----
-
-## 7. 内网验证
-
-健康检查：
+如果曾经重复执行过开机命令，可清理旧监督器后重新启动一次：
 
 ```bash
-curl http://127.0.0.1:8080/health
+ps -eo pid,args | awk '$0 ~ /[s]gcc-watchdog.sh/ {print $1}' | xargs -r kill
+rm -rf /vol1/1000/Disk1/docker/sgcc/data/sgcc-watchdog.lock
+nohup /vol1/1000/Disk1/docker/sgcc/sgcc-watchdog.sh >/dev/null 2>&1 &
+```
+
+## 6. API 接口
+
+### 健康检查
+
+```http
+GET /health
+```
+
+当前 NAS 本机地址：
+
+```text
+http://127.0.0.1:8080/health
 ```
 
 正常返回：
 
 ```json
-{
-  "ok": true,
-  "service": "sgcc-api"
-}
+{"ok": true, "service": "sgcc-api"}
 ```
 
-查询用电数据：
+不需要 Token。
+
+### 获取全部用电数据
+
+```http
+POST /v1/electricity/bill/all
+Authorization: Bearer <SGCC_API_TOKEN>
+Content-Type: application/json
+```
+
+请求体可以为空，或发送 `{}`。
+
+示例：
 
 ```bash
 curl -X POST http://127.0.0.1:8080/v1/electricity/bill/all \
-  -H 'Authorization: Bearer 你的SGCC_API_TOKEN' \
+  -H 'Authorization: Bearer <SGCC_API_TOKEN>' \
   -H 'Content-Type: application/json' \
   -d '{}'
 ```
 
-正常返回结构：
-
-```json
-{
-  "ok": true,
-  "source": "csc-service.sgcc.com.cn",
-  "refresh_time": "2026-09-21T20:00:00+08:00",
-  "accounts": [
-    {
-      "account": {
-        "id": "...",
-        "name": "...",
-        "cons_no": "...",
-        "masked_number": "...",
-        "province": "...",
-        "address": "..."
-      },
-      "daily": [],
-      "latest": {},
-      "current_month_total": 0,
-      "current_year_usage": 0,
-      "current_year_charge": 0,
-      "monthly_bills": [],
-      "balance": {
-        "balance": 0,
-        "amount_due": 0,
-        "history_owe": 0,
-        "date": "..."
-      },
-      "meter": {}
-    }
-  ],
-  "data": {}
-}
-```
-
-Scripting 主要使用：
-
-```text
-accounts[].account
-accounts[].daily
-accounts[].latest
-accounts[].current_month_total
-accounts[].current_year_usage
-accounts[].current_year_charge
-accounts[].monthly_bills
-accounts[].balance
-accounts[].meter
-```
-
----
-
-## 8. 外网访问 / 反向代理
-
-当前示例 Base URL：
+外网 Base URL 由反向代理提供，例如：
 
 ```text
 https://pjqj69wa.kooldns.cn
 ```
 
-当前反向代理使用根路径，没有 `/sgcc` 子路径。
-
-完整接口：
+完整地址：
 
 ```text
-GET  https://pjqj69wa.kooldns.cn/health
-POST https://pjqj69wa.kooldns.cn/v1/electricity/bill/all
+https://pjqj69wa.kooldns.cn/v1/electricity/bill/all
 ```
 
-反向代理目标：
+不要在 Scripting 中保存网上国网账号密码，只保存 NAS API Base URL 和 API Token。
 
-```text
-http://NAS局域网IP:8080
-```
-
-注意：
-
-- 当前不是 Docker 的 `18080:8080` 映射；
-- 当前生产端口是 `8080`；
-- Scripting 中填写 Base URL，不填写完整接口路径；
-- HTTPS 证书必须正常；
-- 不要暴露飞牛管理端口；
-- 不要把网上国网账号密码放入 Scripting。
-
----
-
-## 9. Scripting 侧配置
-
-Scripting 设置页填写：
-
-```text
-数据源：NAS 优先，失败回退 HA
-NAS API Base URL：https://pjqj69wa.kooldns.cn
-NAS API Token：SGCC_API_TOKEN
-```
-
-代码会自动请求：
-
-```text
-POST /v1/electricity/bill/all
-```
-
-不要在 Scripting 里填写：
-
-```text
-SGCC_USERNAME
-SGCC_PASSWORD
-```
-
----
-
-## 10. 接口定义
-
-### `GET /health`
-
-健康检查。
-
-认证：不需要 Token。
-
-响应：
-
-```json
-{
-  "ok": true,
-  "service": "sgcc-api"
-}
-```
-
-### `POST /v1/electricity/bill/all`
-
-获取全部账户用电数据。
-
-认证：需要 Token。
+### 登录/同步
 
 ```http
+POST /v1/auth/login
 Authorization: Bearer <SGCC_API_TOKEN>
-Content-Type: application/json
 ```
 
-请求体可以为空，也可以是：
+此接口用于触发一次登录和数据同步。通常 Scripting 直接使用 `/v1/electricity/bill/all` 即可。
 
-```json
-{}
-```
+## 7. 返回字段
 
-响应包含：
+成功响应包含：
 
 ```text
+ok
+source
+refresh_time
 accounts
 data
-refresh_time
-source
 ```
 
-### `POST /v1/auth/login`
+账户数据包含：
 
-手动触发一次登录和数据同步。
+```text
+account
+daily
+latest
+current_month_total
+current_year_usage
+current_year_charge
+monthly_bills
+balance
+meter
+```
 
-认证：需要同样的 Token。
+## 8. 错误码
 
-首次登录遇到新设备验证时可能返回 `409`，需要在 NAS 端处理设备验证。
+| 状态码 | 含义 |
+|---:|---|
+| 401 | API Token 错误，或网上国网认证失败 |
+| 409 | 网上国网要求设备验证 |
+| 502 | 网上国网上游接口异常 |
+| 503 | 访问网上国网网络失败 |
+| 500 | NAS API 内部错误 |
 
----
-
-## 11. HTTP 状态码
-
-| 状态码 | 含义 | 处理建议 |
-|---:|---|---|
-| 200 | 成功 | 正常 |
-| 401 | API Token 错误，或网上国网认证失败 | 检查 Token、账号密码、登录态 |
-| 409 | 网上国网要求设备验证 | 在 NAS 端处理设备验证 |
-| 502 | 网上国网上游接口异常 | 稍后重试，查看日志 |
-| 503 | NAS 到网上国网网络异常 | 检查网络，稍后重试 |
-| 500 | NAS API 内部错误 | 查看 `data/service.log` |
-
----
-
-## 12. Docker 部署（可选）
-
-当前生产不使用 Docker，但仓库保留可选 Docker 文件。
+## 9. 验证清单
 
 ```bash
-cp .env.example .env
-# 编辑 .env 后执行
-docker compose -f docker-compose.api.yml up -d --build
+cd /vol1/1000/Disk1/docker/sgcc
+.venv/bin/python --version
+.venv/bin/python -c 'import aiohttp, gmssl, cryptography; print("imports OK")'
+curl http://127.0.0.1:8080/health
 ```
 
-`docker-compose.api.yml` 默认示例可能使用：
+预期：
 
 ```text
-18080:8080
+Python 3.12.x
+imports OK
+{"ok": true, "service": "sgcc-api"}
 ```
 
-如果使用 Docker，则访问：
-
-```text
-http://NAS局域网IP:18080/health
-```
-
-如果使用当前推荐 Python 虚拟环境，则访问：
-
-```text
-http://NAS局域网IP:8080/health
-```
-
-不要混用两个端口。
-
----
-
-## 13. 常见问题
-
-### 1. `/health` 正常，但数据接口 401
-
-检查：
-
-- `Authorization: Bearer <SGCC_API_TOKEN>` 是否正确；
-- `.env` 中 `SGCC_API_TOKEN` 是否和 Scripting 一致；
-- 网上国网账号密码是否正确；
-- NAS 端登录状态是否失效。
-
-### 2. 返回 409
-
-说明网上国网认为这是新设备或需要验证。不要反复删除 `data/state.json`。需要在 NAS 端完成设备验证。
-
-### 3. `accounts` 为空
-
-可能原因：
-
-- 网上国网账号下无绑定户号；
-- 国网接口临时异常；
-- 登录态异常；
-- `SGCC_HISTORY_MONTHS` 设置过低通常不会导致账户为空，但会影响日用电历史长度。
-
-### 4. Scripting 外网打不开 NAS
-
-检查：
-
-- iPhone 使用蜂窝网络时能否打开 `/health`；
-- 域名是否解析到正确公网入口；
-- 反向代理是否转发到 `8080`；
-- HTTPS 证书是否有效。
-
----
-
-## 14. 安全建议
-
-- `SGCC_API_TOKEN` 使用长随机字符串；
-- 不公开 `.env`；
-- 不公开 `data/state.json`；
-- 不把网上国网账号密码放入 Scripting；
-- 不把 NAS API Token 截图发到公开场景；
-- 如怀疑泄露，立即更换 `.env` 中的 `SGCC_API_TOKEN` 并重启服务。
+本服务是基于网上国网 App 协议的非官方实现。网上国网修改登录、加密或接口协议时，可能需要更新代码。
