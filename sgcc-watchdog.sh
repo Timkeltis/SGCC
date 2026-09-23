@@ -10,7 +10,7 @@ MANUAL_STOP_MARKER="$DATA_DIR/service.manual-stop"
 LOG="$DATA_DIR/service.log"
 PORT=${PORT:-8080}
 LOCK_DIR="$DATA_DIR/sgcc-watchdog.lock"
-DELAY=${SGCC_START_DELAY:-50}
+DELAY=${SGCC_START_DELAY:-0}
 INTERVAL=${SGCC_CHECK_INTERVAL:-10}
 
 mkdir -p "$DATA_DIR"
