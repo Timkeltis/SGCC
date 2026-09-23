@@ -147,15 +147,14 @@ data/state.json
 在飞牛 NAS 的“开机任务”中只配置一次以下命令：
 
 ```bash
-nohup /vol1/1000/Disk1/docker/sgcc/sgcc-watchdog.sh >/dev/null 2>&1 &
+/vol1/1000/Disk1/docker/sgcc/sgcc-boot-task.sh
 ```
 
-`sgcc-watchdog.sh` 的行为：
+入口脚本会自行脱离 cron 并启动 watchdog；不要在 crontab 行中额外添加 `nohup` 或 `&`。watchdog 会立即检查 `/health`，之后每 10 秒检查一次。`sgcc-watchdog.sh` 的行为：
 
 ```text
 NAS 开机任务启动
-→ 等待 50 秒
-→ 检查 /health
+→ 立即检查 /health
 → 服务未运行时执行 start-api.sh
 → 每 10 秒检查一次
 → 服务异常退出后自动启动

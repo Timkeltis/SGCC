@@ -50,6 +50,7 @@ SGCC/
 ├── sgcc_client/              # NAS 端网上国网 App 协议客户端
 ├── start-api.sh              # NAS API 启动脚本
 ├── stop-api.sh               # NAS API 手动停止脚本
+├── sgcc-boot-task.sh         # NAS 开机任务入口
 ├── sgcc-watchdog.sh          # NAS 开机延迟与异常自动重启脚本
 ├── requirements-api.txt      # NAS Python 3.12 依赖
 ├── .env.example              # NAS 环境变量模板，不要提交真实 .env
@@ -155,10 +156,10 @@ tail -f data/service.log
 在飞牛 NAS 的“开机任务”中只执行一次：
 
 ```bash
-nohup /vol1/1000/Disk1/docker/sgcc/sgcc-watchdog.sh >/dev/null 2>&1 &
+/vol1/1000/Disk1/docker/sgcc/sgcc-boot-task.sh
 ```
 
-监督器会等待 50 秒，然后每 10 秒检查 `/health`。服务异常退出时自动执行 `start-api.sh`；执行 `stop-api.sh` 后会写入手动停止标记，监督器不会自动拉起。不要重复创建多个相同的常驻开机任务。
+入口脚本会自行脱离 cron，并启动 watchdog；不要在 crontab 行中额外添加 `nohup` 或 `&`。
 
 ```text
 飞牛 NAS 开机
