@@ -11,7 +11,7 @@ LOG="$DATA_DIR/service.log"
 PORT=${PORT:-8080}
 LOCK_DIR="$DATA_DIR/sgcc-watchdog.lock"
 DELAY=${SGCC_START_DELAY:-0}
-INTERVAL=${SGCC_CHECK_INTERVAL:-10}
+INTERVAL=${SGCC_CHECK_INTERVAL:-3600}
 
 mkdir -p "$DATA_DIR"
 if ! mkdir "$LOCK_DIR" 2>/dev/null; then
