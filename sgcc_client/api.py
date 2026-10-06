@@ -112,8 +112,10 @@ def build_daily_usage_payload(
         "data": {
             "acctId": "acctid01",
             "channelCode": "SGAPP",
-            "consNo": account.cons_no,
-            "consNosrc": account.cons_no_src,
+            # The API response's cons_no is sourced from consNo_dst; the paired
+            # cons_no_src is the opaque source value consumed by this endpoint.
+            "consNo": account.cons_no_src,
+            "consNosrc": account.cons_no,
             "endTime": end_date.isoformat(),
             "consType": account.cons_type,
             "funcCode": "ALIPAY_01",
@@ -137,7 +139,8 @@ def build_monthly_bills_payload(account: PowerAccount, year: int) -> dict[str, A
         "target": account.pro_no,
         "data": {
             "year": year,
-            "consNo": account.cons_no,
+            # Monthlycharge requires the paired cons_no_src value here.
+            "consNo": account.cons_no_src,
             "provinceCode": account.pro_no,
             "startYm": f"{year}01",
             "endYm": f"{year}12",
@@ -449,6 +452,14 @@ class StateGridAppApi:
             raise StateGridApiError(
                 top_code,
                 message or str(response.get("message", "")),
+                source="gateway",
+            )
+        if not data:
+            # A successful gateway envelope with no business payload is a
+            # protocol error, not a valid empty result.
+            raise StateGridApiError(
+                "missing_business_data",
+                "gateway returned success without a business payload",
                 source="gateway",
             )
         return data

@@ -1,3 +1,10 @@
+## 1.6.1-nas
+
+- 修复 NAS 日用电和月账单请求中 `cons_no` / `cons_no_src` 的字段映射，避免账户识别成功但电量/账单数据为空。
+- 网关报告成功但没有业务数据时抛出明确的 `missing_business_data` API 错误，避免将空响应伪装成有效结果。
+- 新增 NAS API 回归测试，覆盖日/月请求字段、余额/表计既有映射及空业务响应。
+- NAS 实测确认修复后返回日用电与月账单记录；上游未提供的可选字段仍可能为空。
+
 ## 1.6.0-nas-only
 
 - 移除 Scripting 侧 Home Assistant / hass-state-grid 取数、自动回退、数据源选择和 HA Token 设置。
