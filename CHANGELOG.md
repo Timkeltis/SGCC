@@ -1,7 +1,14 @@
+## 1.6.0-nas-only
+
+- 移除 Scripting 侧 Home Assistant / hass-state-grid 取数、自动回退、数据源选择和 HA Token 设置。
+- 设置页现在仅保留 NAS API Base URL 与 NAS API Token。
+- 旧版 Storage 中的 HA 地址、HA Token 和数据源配置会在下次保存时移除。
+- NAS 返回空账户数据时直接显示 NAS 诊断错误，不再用 HA 数据替代。
+
 ## 1.5.0-nas
 
 - 新增 NAS SGCC API 数据源，默认优先通过 NAS 直连网上国网数据。
-- NAS API 失败且 Home Assistant 配置完整时，自动回退 HA / hass-state-grid。
+- NAS API 用于直连网上国网数据；后续 1.6.0-nas-only 已移除 HA 回退。
 - 设置页新增 NAS API Base URL 和 NAS API Token；Scripting 不保存网上国网账号密码。
 - Scripting 端将 NAS API 返回的 `accounts` 转换为现有小组件 `RawAccount` 格式，UI 无需大面积改动。
 - 更新 README / API 文档，完整补充 Scripting 小组件、飞牛 NAS Python 虚拟环境部署、`.env` 配置、开机任务、外网反代、接口验证和故障排查说明。
